@@ -5,7 +5,7 @@
 ## <scalisi.a@gmail.com>
 ##
 ## Started on  Wed May 30 11:55:22 2012 Anthony Scalisi
-## Last update Wed Jun 13 20:38:44 2012 Anthony Scalisi
+## Last update Thu Jun 14 13:02:53 2012 Anthony Scalisi
 ##
 
 OK_STATE=0
@@ -16,8 +16,8 @@ EXPECTED_ARGS=6
 E_BADARGS=65
 
 if [[ "$#" -ne "$EXPECTED_ARGS" ]]; then
-    echo "Usage: `basename $0` [host] [port] [password]"
-    exit ${UNKNOWN_STATE}
+	echo "Usage: `basename $0` [host] [port] [password]"
+	exit ${UNKNOWN_STATE}
 fi
 
 host="-h $2"
@@ -27,37 +27,39 @@ pass="-a $6"
 grep="/opt/local/bin/grep"
 cli="/opt/local/bin/redis-cli"
 
-if $cli $host $port $pass PING | $grep -qi PONG; then
-#	echo "OK - Redis responded to PING command."
-#	exit ${OK_STATE}
-	if $cli $host $port $pass info | $grep -qi "role:master"; then
-		if $cli $host $port $pass info | $grep -qEi "slave.*offline"; then
-			echo "WARNING - Redis slave is offline."
-			exit ${WARNING_STATE}
-		elif $cli $host $port $pass info | $grep -qEi "slave.*online"; then
-			echo "OK - Redis slave is online."
-			exit ${OK_STATE}
-		else
-			echo "UNKNOWN - Can't determine slave status"
-			exit ${UNKNOWN_STATE}
-		fi
-	elif $cli $host $port $pass info | $grep -qi "role:slave"; then
-		if $cli $host $port $pass info | $grep -qEi "master_link_status:down"; then
-			echo "CRITICAL - Redis slave can't talk to the master"
-			exit ${CRITICAL_STATE}
-		elif $cli $host $port $pass info | $grep -qEi "master_link_status:up"; then
-			echo "OK - Redis slave can talk to the master"
-			exit ${OK_STATE}
-		fi
-	else
-		echo "UNKNOWN - Can't determine master/slave status"
+if [[ "`$cli $host $port $pass PING | $grep -i PONG | wc -l`" -eq "1" ]]; then
+    if [[ "`$cli $host $port $pass info | $grep -i "role:master" | wc -l`" -eq "1" ]]; then
+	if [[ "`$cli $host $port $pass info | $grep -i 'slaves' | sed -e 's/.*://' | bc`" -ne "0" ]]; then
+	    if [[ "`$cli $host $port $pass info | $grep -i "offline" | wc -l`" -eq "1" ]]; then
+		echo "WARNING - Redis slave is offline."
+		exit ${WARNING_STATE}
+	    elif [[ "`$cli $host $port $pass info | $grep -i "online" | wc -l`" -eq "1" ]]; then
+		echo "OK - Redis slave is online."
+		exit ${OK_STATE}
+	    else
+		echo "UNKNOWN - Can't determine if the slave is online or offline."
 		exit ${UNKNOWN_STATE}
+	    fi
+	elif [[ "`$cli $host $port $pass info | $grep -i 'slaves' | sed -e 's/.*://' | bc`" -eq "0" ]]; then
+	    echo "OK - Redis is responding."
+	    exit ${OK_STATE}
+	else
+	    echo "UNKNOWN - Can't determine slave status"
+	    exit ${UNKNOWN_STATE}
 	fi
+    elif [[ "`$cli $host $port $pass info | $grep -i "role:slave" | wc -l`" -eq "1" ]]; then
+	if [[ "`$cli $host $port $pass info | $grep -Ei "master_link_status:down" | wc -l`" -eq "1" ]]; then
+	    echo "CRITICAL - Redis slave can't talk to the master"
+	    exit ${CRITICAL_STATE}
+	elif [[ "`$cli $host $port $pass info | $grep -Ei "master_link_status:up" | wc -l`" -eq "1" ]]; then
+	    echo "OK - Redis slave can talk to the master"
+	    exit ${OK_STATE}
+	fi
+    else
+	echo "UNKNOWN - Can't determine master/slave status"
+	exit ${UNKNOWN_STATE}
+    fi
 else
 	echo "CRITICAL - Redis didn't respond to PING command."
 	exit ${CRITICAL_STATE}
 fi
-
-#if [[ "`$cli $host $port $pass PING | $grep -qi PONG`" -eq "0" ]]; then
-#        echo "OK - Redis is responding."
-#fi
