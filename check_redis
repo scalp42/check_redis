@@ -1,0 +1,63 @@
+#!/bin/bash
+## check_redis for Nagios in /Users/fresh/nagios/check_redis
+##
+## Made by Anthony Scalisi
+## <scalisi.a@gmail.com>
+##
+## Started on  Wed May 30 11:55:22 2012 Anthony Scalisi
+## Last update Wed Jun 13 17:28:36 2012 Anthony Scalisi
+##
+
+OK_STATE=0
+WARNING_STATE=1
+CRITICAL_STATE=2
+UNKNOWN_STATE=3
+EXPECTED_ARGS=5
+E_BADARGS=65
+
+if [[ "$#" -ne "$EXPECTED_ARGS" ]]; then
+    echo "Usage: `basename $0` [host] [port] [password]"
+    exit ${UNKNOWN_STATE}
+fi
+
+host="-h $1"
+port="-p $3"
+pass="-a $5"
+
+grep="/opt/local/bin/grep"
+cli="/opt/local/bin/redis-cli"
+
+if $cli $host $port $pass PING | $grep -qi PONG; then
+#	echo "OK - Redis responded to PING command."
+#	exit ${OK_STATE}
+	if $cli $host $port $pass info | $grep -qi "role:master"; then
+		if $cli $host $port $pass info | $grep -qEi "slave.*offline"; then
+			echo "WARNING - Redis slave is offline."
+			exit ${WARNING_STATE}
+		elif $cli $host $port $pass info | $grep -qEi "slave.*online"; then
+			echo "OK - Redis slave is online."
+			exit ${OK_STATE}
+		else
+			echo "UNKNOWN - Can't determine slave status"
+			exit ${UNKNOWN_STATE}
+		fi
+	elif $cli $host $port $pass info | $grep -qi "role:slave"; then
+		if $cli $host $port $pass info | $grep -qEi "master_link_status:down"; then
+			echo "CRITICAL - Redis slave can't talk to the master"
+			exit ${CRITICAL_STATE}
+		elif $cli $host $port $pass info | $grep -qEi "master_link_status:up"; then
+			echo "OK - Redis slave can talk to the master"
+			exit ${OK_STATE}
+		fi
+	else
+		echo "UNKNOWN - Can't determine master/slave status"
+		exit ${UNKNOWN_STATE}
+	fi
+else
+	echo "CRITICAL - Redis didn't respond to PING command."				
+	exit ${CRITICAL_STATE}
+fi
+
+#if [[ "`$cli $host $port $pass PING | $grep -qi PONG`" -eq "0" ]]; then
+#        echo "OK - Redis is responding."
+#fi
