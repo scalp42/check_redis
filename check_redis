@@ -12,7 +12,7 @@ OK_STATE=0
 WARNING_STATE=1
 CRITICAL_STATE=2
 UNKNOWN_STATE=3
-EXPECTED_ARGS=5
+EXPECTED_ARGS=6
 E_BADARGS=65
 
 if [[ "$#" -ne "$EXPECTED_ARGS" ]]; then
@@ -20,9 +20,9 @@ if [[ "$#" -ne "$EXPECTED_ARGS" ]]; then
     exit ${UNKNOWN_STATE}
 fi
 
-host="-h $1"
-port="-p $3"
-pass="-a $5"
+host="-h $2"
+port="-p $4"
+pass="-a $6"
 
 grep="/opt/local/bin/grep"
 cli="/opt/local/bin/redis-cli"
